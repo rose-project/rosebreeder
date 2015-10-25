@@ -1,20 +1,21 @@
 #!/bin/bash
-
+SCRIPTNAME=$(basename $0)
+SCRIPTDIR=$(dirname $(readlink -e $0))
 
 usage()
 {
-	APPNAME=$(basename $1)
 	cat << EOF 
-	usage: ${APPNAME}	[-options] <destDir>
+	usage: ${SCRIPTNAME}	[-options] <destDir>
 
 EOF
 }
 
 
+
 while getopts "h?p" opt; do
     case "$opt" in
     h|\?)
-        usage $0
+        usage
         exit 0
         ;;
     v)  verbose=1
@@ -30,14 +31,14 @@ shift $((OPTIND-1))
 
 if [[ $# -ne 1 ]]; then
 	echo "Error: Unknown arguments"	
-	usage $0
+	usage
 	exit -1;
 fi
 
-DESTDIR=$1
+DESTDIR=$(readlink -m $1)
 
 if [[ -d ${DESTDIR} ]]; then
-	echo "Warning! Destination directory does already exists!"
+	echo "Warning! Destination directory does already exist [${DESTDIR}]!"
 	echo -n "Proceed? [N/y]: "
 	read overwrite
 	overwrite=${overwrite,,}
@@ -57,7 +58,7 @@ DESTBASE=$(basename ${DESTDIR})
 
 git clone -b fido git://git.openembedded.org/openembedded-core $DESTBASE
 
-pushd $DESTBASE
+pushd $DESTBASE > /dev/null
 
 git clone -b 1.26 git://git.openembedded.org/bitbake bitbake
 git clone https://github.com/rose-project/meta-raspberrypi-bsp.git
@@ -66,8 +67,10 @@ git clone -b fido https://github.com/meta-qt5/meta-qt5.git
 git clone https://github.com/rose-project/meta-villa.git
 
 echo "TEMPLATECONF=\${TEMPLATECONF:-meta-villa/conf}" > .templateconf
+popd > /dev/null
 
-popd
+cp -f ${SCRIPTDIR}/makeBuildDir.sh ${DESTDIR}/makeBuildDir
+chmod +x ${DESTDIR}/makeBuildDir
 
 echo "Checkout done, have much fun!"
 
