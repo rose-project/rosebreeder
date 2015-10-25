@@ -2,26 +2,28 @@
 SCRIPTNAME=$(basename $0)
 SCRIPTDIR=$(dirname $(readlink -e $0))
 
+PROJECT="rose-base"
+projectList=("villa-os" ${PROJECT})
+
 usage()
 {
 	cat << EOF 
 	usage: ${SCRIPTNAME}	[-options] <destDir>
-
+			-p <PROJECT>	
+			-? -h 			show this help message
 EOF
 }
 
 
 
-while getopts "h?p" opt; do
+while getopts "h?p:" opt; do
     case "$opt" in
     h|\?)
         usage
         exit 0
         ;;
-    v)  verbose=1
+    p)  PROJECT=${OPTARG,,}
         ;;
-#    f)  output_file=$OPTARG
-#        ;;
     esac
 done
 
@@ -33,6 +35,15 @@ if [[ $# -ne 1 ]]; then
 	echo "Error: Unknown arguments"	
 	usage
 	exit -1;
+fi
+
+if [[ ! -z ${PROJECT} ]];then
+	match=$(echo "${projectList[@]:0}" | grep -o $PROJECT)
+	if [[ -z $match ]]; then
+		echo "Unknown Project: $PROJECT"
+		echo "These are available: ${projectList}"
+		exit -1
+	fi
 fi
 
 DESTDIR=$(readlink -m $1)
@@ -63,10 +74,21 @@ pushd $DESTBASE > /dev/null
 git clone -b 1.26 git://git.openembedded.org/bitbake bitbake
 git clone https://github.com/rose-project/meta-raspberrypi-bsp.git
 git clone https://github.com/rose-project/meta-rose.git
-git clone -b fido https://github.com/meta-qt5/meta-qt5.git
-git clone https://github.com/rose-project/meta-villa.git
 
-echo "TEMPLATECONF=\${TEMPLATECONF:-meta-villa/conf}" > .templateconf
+case ${PROJECT} in
+	"villa-os" )
+		git clone -b fido https://github.com/meta-qt5/meta-qt5.git
+		git clone https://github.com/rose-project/meta-villa.git
+		echo "TEMPLATECONF=\${TEMPLATECONF:-meta-villa/conf}" > .templateconf
+		;;
+	"rose-base" )
+		echo "TEMPLATECONF=\${TEMPLATECONF:-meta-rose/conf}" > .templateconf
+		;;
+	*)
+		echo "Warning! Unknown Project!" 
+		;;		
+esac
+
 popd > /dev/null
 
 cp -f ${SCRIPTDIR}/makeBuildDir.sh ${DESTDIR}/makeBuildDir
