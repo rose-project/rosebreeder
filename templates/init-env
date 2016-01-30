@@ -1,0 +1,28 @@
+#!/bin/bash
+
+TEMPLATE=${TPL_CONF}
+SRC_SCRIPT=${TPL_SRC}
+BUILD_DIR=${TPL_BUILD}
+
+ERROR=0
+
+if [[ "$BASH_SOURCE" == "$0" ]];then
+    echo "script is not sourced:"
+    echo "source ./init-env"
+    ERROR=1
+fi
+
+if [ ! -e $SRC_SCRIPT ]; then
+    echo "Yocto src dir not correct: $SRC_SCRIPT"
+    ERROR=2
+fi
+
+if [ ! -d $BUILD_DIR ]; then
+    echo "Build directory not correct! Maybe moved this folder?"
+    ERROR=3
+fi
+
+if [ 0 -eq $ERROR ]; then
+    TEMPLATECONF=$TEMPLATE source $SRC_SCRIPT $BUILD_DIR
+fi
+
