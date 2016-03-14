@@ -47,6 +47,8 @@ if [[ "${CONF,,}" == "rose" ]]; then
     TPL_CONF="meta-rose/conf"
 elif [[ "${CONF,,}" == "villa" ]]; then
     TPL_CONF="meta-villa/conf"
+elif [[ "${CONF,,}" == "gadgets" ]]; then
+    TPL_CONF="meta-gadgets/conf"
 else
     echo "Unknown project ${CONF}"
     exit -2;
@@ -65,9 +67,9 @@ do
     line=${line//\`/\\\`}
     line=${line//\$/\\\$}
     line=${line//\\\${/\${}
-    eval "echo \"$line\""; 
+    eval "echo \"$line\"";
 done < templates/init-env >  ${BUILD_DIR}/init-env
- 
+
 echo "Build dir created"
 echo "to start work do the following steps:"
 echo ""
