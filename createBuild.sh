@@ -9,7 +9,7 @@ Usage: $0 [p:h] <BUILD_DIR>
 
     optional options:
         -h          show this help message
-        -p Project  valid projects are "rose" [default] and "villa"
+        -p Project  valid projects are "meta-rose" [default] and "meta-villa"
 EOF
 
 exit -1
@@ -17,7 +17,7 @@ exit -1
 
 BUILD_DIR=
 
-CONF=rose
+CONF=meta-rose
 TPL_CONF=
 
 REPO_DIR=$(dirname $(readlink -e $(pwd)/../poky/oe-init-build-env))
@@ -43,16 +43,13 @@ fi
 
 BUILD_DIR=$1
 
-if [[ "${CONF,,}" == "rose" ]]; then
-    TPL_CONF="meta-rose/conf"
-elif [[ "${CONF,,}" == "villa" ]]; then
-    TPL_CONF="meta-villa/conf"
-elif [[ "${CONF,,}" == "gadgets" ]]; then
-    TPL_CONF="meta-gadgets/conf"
-else
-    echo "Unknown project ${CONF}"
+if [[ ! -d ${REPO_DIR}/${CONF}/conf ]]; then
+    echo "Template configuration not found ${CONF}"
     exit -2;
 fi
+
+TPL_CONF="${CONF}/conf"
+
 
 pushd ${REPO_DIR}  > /dev/null
 TEMPLATECONF=${TPL_CONF} . $REPO_DIR/oe-init-build-env ${BUILD_DIR}  > /dev/null
