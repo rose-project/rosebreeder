@@ -15,5 +15,4 @@ BUILD_DIR=$(dirname $(bitbake -e rose-image-minimal | awk -F ' *= *' '$1=="ROOTF
 wic create ${WIC_TEMPLATE} -e ${PRIMARY_IMAGE} \
 	--rootfs-dir rootfs_prim=${PRIMARY_IMAGE} \
 	--rootfs-dir rootfs_rec=${RECOVERY_IMAGE} \
-	--outdir=${BUILD_DIR} \
-	-DD
+	--outdir=${BUILD_DIR}
