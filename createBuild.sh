@@ -67,6 +67,8 @@ do
     eval "echo \"$line\"";
 done < templates/init-env >  ${BUILD_DIR}/init-env
 
+cp -f templates/makeImage.sh ${BUILD_DIR}/makeImage
+
 echo "Build dir created"
 echo "to start work do the following steps:"
 echo ""
