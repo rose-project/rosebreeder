@@ -1,16 +1,17 @@
-From 91ce00d277e52479853bb03e439095639c911394 Mon Sep 17 00:00:00 2001
+From d43457bb56bee2c55da9abbcbf9d2a0ef43f0d0c Mon Sep 17 00:00:00 2001
 From: Christian Fries <christian.fries123@gmail.com>
-Date: Tue, 23 Aug 2016 15:11:09 +0200
+Date: Thu, 25 Aug 2016 11:14:08 +0200
 Subject: [PATCH] add support to split a rootfs in sub partitions Per default
  wic does not support this. it is nice to have a full rootfs for testing with
  qemu, but for deployment on a productive flash/sd it makes more sense to
  split the rootfs. With this patch it is possible to reach both goals... enjoy
 
 ---
- scripts/lib/wic/engine.py    |  1 +
- scripts/lib/wic/ksparser.py  | 16 ++++++++++++++++
- scripts/lib/wic/partition.py |  7 +++++++
- 3 files changed, 24 insertions(+)
+ scripts/lib/wic/engine.py        |  1 +
+ scripts/lib/wic/imager/direct.py |  5 ++++-
+ scripts/lib/wic/ksparser.py      | 16 ++++++++++++++++
+ scripts/lib/wic/partition.py     | 16 +++++++++++++++-
+ 4 files changed, 36 insertions(+), 2 deletions(-)
 
 diff --git a/scripts/lib/wic/engine.py b/scripts/lib/wic/engine.py
 index 76b93e8..12a8a10 100644
@@ -24,6 +25,26 @@ index 76b93e8..12a8a10 100644
      bootimg_dir - absolute path to the build's boot artifacts directory
      kernel_dir - absolute path to the build's kernel directory
      native_sysroot - absolute path to the build's native sysroots dir
+diff --git a/scripts/lib/wic/imager/direct.py b/scripts/lib/wic/imager/direct.py
+index a1b4249..ee9dc00 100644
+--- a/scripts/lib/wic/imager/direct.py
++++ b/scripts/lib/wic/imager/direct.py
+@@ -341,11 +341,14 @@ class DirectImageCreator(BaseImageCreator):
+         for part in parts:
+             if part.rootfs_dir is None:
+                 continue
++            prefix = ''
+             if part.mountpoint == '/':
+                 suffix = ':'
+             else:
+                 suffix = '["%s"]:' % (part.mountpoint or part.label)
+-            msg += '  ROOTFS_DIR%s%s\n' % (suffix.ljust(20), part.rootfs_dir)
++            if part.submount_dir:
++                prefix = '%s' % (part.submount_dir)
++            msg += '  ROOTFS_DIR%s%s\n' % (suffix.ljust(20), (part.rootfs_dir + prefix))
+
+         msg += '  BOOTIMG_DIR:                  %s\n' % self.bootimg_dir
+         msg += '  KERNEL_DIR:                   %s\n' % self.kernel_dir
 diff --git a/scripts/lib/wic/ksparser.py b/scripts/lib/wic/ksparser.py
 index 8c3f808..1ad0e03 100644
 --- a/scripts/lib/wic/ksparser.py
@@ -70,7 +91,7 @@ index 8c3f808..1ad0e03 100644
 +                exclude_list = submount[fs]
 +                self.partitions[r-1].exclude_dirs = [s.strip('/') for s in exclude_list]
 diff --git a/scripts/lib/wic/partition.py b/scripts/lib/wic/partition.py
-index f40d1bc..506b5b5 100644
+index f40d1bc..fe64179 100644
 --- a/scripts/lib/wic/partition.py
 +++ b/scripts/lib/wic/partition.py
 @@ -54,6 +54,7 @@ class Partition(object):
@@ -89,17 +110,28 @@ index f40d1bc..506b5b5 100644
  
      def get_extra_block_count(self, current_blocks):
          """
-@@ -205,6 +207,9 @@ class Partition(object):
+@@ -205,9 +207,19 @@ class Partition(object):
          """
          Prepare content for an ext2/3/4 rootfs partition.
          """
 +        if self.submount_dir:
 +            rootfs_dir = rootfs_dir + "/" + self.submount_dir
 +
++        exclude_size = 0
++        if self.exclude_dirs:
++            for exdir in self.exclude_dirs:
++                du_cmd = "du -ks %s" % (rootfs_dir + "/" + exdir)
++                out = exec_cmd(du_cmd)
++                exclude_size += int(out.split()[0])
++
          du_cmd = "du -ks %s" % rootfs_dir
          out = exec_cmd(du_cmd)
-         actual_rootfs_size = int(out.split()[0])
-@@ -231,6 +236,8 @@ class Partition(object):
+-        actual_rootfs_size = int(out.split()[0])
++        actual_rootfs_size = int(out.split()[0]) - exclude_size
+
+         extra_blocks = self.get_extra_block_count(actual_rootfs_size)
+         if extra_blocks < self.extra_space:
+@@ -231,6 +243,8 @@ class Partition(object):
  
          mkfs_cmd = "mkfs.%s -F %s %s %s -d %s" % \
              (self.fstype, extra_imagecmd, rootfs, label_str, rootfs_dir)
