@@ -1,17 +1,17 @@
-From d43457bb56bee2c55da9abbcbf9d2a0ef43f0d0c Mon Sep 17 00:00:00 2001
+From 63f1cddaad77f808205a62d0431e72100e4218aa Mon Sep 17 00:00:00 2001
 From: Christian Fries <christian.fries123@gmail.com>
-Date: Thu, 25 Aug 2016 11:14:08 +0200
-Subject: [PATCH] add support to split a rootfs in sub partitions Per default
- wic does not support this. it is nice to have a full rootfs for testing with
- qemu, but for deployment on a productive flash/sd it makes more sense to
+Date: Thu, 1 Sep 2016 18:54:30 +0200
+Subject: [PATCH] add support to split a rootfs in sub partitions Per default 
+ wic does not support this. it is nice to have a full rootfs for testing with 
+ qemu, but for deployment on a productive flash/sd it makes more sense to 
  split the rootfs. With this patch it is possible to reach both goals... enjoy
 
 ---
  scripts/lib/wic/engine.py        |  1 +
  scripts/lib/wic/imager/direct.py |  5 ++++-
  scripts/lib/wic/ksparser.py      | 16 ++++++++++++++++
- scripts/lib/wic/partition.py     | 16 +++++++++++++++-
- 4 files changed, 36 insertions(+), 2 deletions(-)
+ scripts/lib/wic/partition.py     | 20 +++++++++++++++++---
+ 4 files changed, 38 insertions(+), 4 deletions(-)
 
 diff --git a/scripts/lib/wic/engine.py b/scripts/lib/wic/engine.py
 index 76b93e8..12a8a10 100644
@@ -42,7 +42,7 @@ index a1b4249..ee9dc00 100644
 +            if part.submount_dir:
 +                prefix = '%s' % (part.submount_dir)
 +            msg += '  ROOTFS_DIR%s%s\n' % (suffix.ljust(20), (part.rootfs_dir + prefix))
-
+ 
          msg += '  BOOTIMG_DIR:                  %s\n' % self.bootimg_dir
          msg += '  KERNEL_DIR:                   %s\n' % self.kernel_dir
 diff --git a/scripts/lib/wic/ksparser.py b/scripts/lib/wic/ksparser.py
@@ -91,7 +91,7 @@ index 8c3f808..1ad0e03 100644
 +                exclude_list = submount[fs]
 +                self.partitions[r-1].exclude_dirs = [s.strip('/') for s in exclude_list]
 diff --git a/scripts/lib/wic/partition.py b/scripts/lib/wic/partition.py
-index f40d1bc..fe64179 100644
+index f40d1bc..b0e795c 100644
 --- a/scripts/lib/wic/partition.py
 +++ b/scripts/lib/wic/partition.py
 @@ -54,6 +54,7 @@ class Partition(object):
@@ -110,28 +110,21 @@ index f40d1bc..fe64179 100644
  
      def get_extra_block_count(self, current_blocks):
          """
-@@ -205,9 +207,19 @@ class Partition(object):
+@@ -205,7 +207,13 @@ class Partition(object):
          """
          Prepare content for an ext2/3/4 rootfs partition.
          """
 +        if self.submount_dir:
 +            rootfs_dir = rootfs_dir + "/" + self.submount_dir
 +
-+        exclude_size = 0
+         du_cmd = "du -ks %s" % rootfs_dir
 +        if self.exclude_dirs:
 +            for exdir in self.exclude_dirs:
-+                du_cmd = "du -ks %s" % (rootfs_dir + "/" + exdir)
-+                out = exec_cmd(du_cmd)
-+                exclude_size += int(out.split()[0])
-+
-         du_cmd = "du -ks %s" % rootfs_dir
++                du_cmd = du_cmd + " --exclude " + exdir
          out = exec_cmd(du_cmd)
--        actual_rootfs_size = int(out.split()[0])
-+        actual_rootfs_size = int(out.split()[0]) - exclude_size
-
-         extra_blocks = self.get_extra_block_count(actual_rootfs_size)
-         if extra_blocks < self.extra_space:
-@@ -231,6 +243,8 @@ class Partition(object):
+         actual_rootfs_size = int(out.split()[0])
+ 
+@@ -231,6 +239,8 @@ class Partition(object):
  
          mkfs_cmd = "mkfs.%s -F %s %s %s -d %s" % \
              (self.fstype, extra_imagecmd, rootfs, label_str, rootfs_dir)
@@ -140,6 +133,34 @@ index f40d1bc..fe64179 100644
          exec_native_cmd(mkfs_cmd, native_sysroot, pseudo=pseudo)
  
      def prepare_rootfs_btrfs(self, rootfs, oe_builddir, rootfs_dir,
+@@ -241,6 +251,9 @@ class Partition(object):
+         Currently handles ext2/3/4 and btrfs.
+         """
+         du_cmd = "du -ks %s" % rootfs_dir
++        if self.exclude_dirs:
++            for exdir in self.exclude_dirs:
++                du_cmd = du_cmd + " --exclude " + exdir
+         out = exec_cmd(du_cmd)
+         actual_rootfs_size = int(out.split()[0])
+ 
+@@ -262,8 +275,10 @@ class Partition(object):
+         if self.label:
+             label_str = "-L %s" % self.label
+ 
+-        mkfs_cmd = "mkfs.%s -b %d -r %s %s %s" % \
+-            (self.fstype, rootfs_size * 1024, rootfs_dir, label_str, rootfs)
++        mkfs_cmd = "mkfs.%s -F %s %s %s -d %s" % \
++                   (self.fstype, extra_imagecmd, rootfs, label_str, rootfs_dir)
++        if self.exclude_dirs:
++            mkfs_cmd = mkfs_cmd + " -w %s" % ",".join(self.exclude_dirs)
+         exec_native_cmd(mkfs_cmd, native_sysroot, pseudo=pseudo)
+ 
+     def prepare_rootfs_vfat(self, rootfs, oe_builddir, rootfs_dir,
+@@ -411,4 +426,3 @@ class Partition(object):
+             label_str = "-L %s" % self.label
+         mkswap_cmd = "mkswap %s -U %s %s" % (label_str, str(uuid.uuid1()), path)
+         exec_native_cmd(mkswap_cmd, native_sysroot)
+-
 -- 
 2.7.4
 
